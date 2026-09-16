@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: make ci (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Keep this job headless; the Linux SDL smoke explicitly skips without a display.
+      DISPLAY: ''
+      WAYLAND_DISPLAY: ''
+      GOTOOLCHAIN: local
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run CI checks
+        run: make ci
