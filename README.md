@@ -4,6 +4,7 @@
 
 **A declarative desktop GUI framework for Go.**
 
+[![Test](https://github.com/dxui-org/dxui/actions/workflows/ci.yml/badge.svg)](https://github.com/dxui-org/dxui/actions)
 [![GoDoc](https://pkg.go.dev/badge/github.com/dxui-org/dxui)](https://pkg.go.dev/github.com/dxui-org/dxui)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 
