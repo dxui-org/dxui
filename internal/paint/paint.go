@@ -183,14 +183,23 @@ func Replay(list DisplayList, painter Painter) error {
 		case CommandDrawShadow:
 			shadow := command.Shadow
 			shadow.Color = withOpacity(shadow.Color, opacities[len(opacities)-1])
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.DrawShadow(command.Rect, command.Radii, shadow); err != nil {
 				return fmt.Errorf("paint: command %d shadow: %w", index, err)
 			}
 		case CommandFillRoundedRect:
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.FillRoundedRect(command.Rect, command.Radii, withOpacity(command.Color, opacities[len(opacities)-1]), command.JoinedEdges); err != nil {
 				return fmt.Errorf("paint: command %d fill: %w", index, err)
 			}
 		case CommandStrokeRoundedRect:
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.StrokeRoundedRect(command.Rect, command.Radii, command.Width, withOpacity(command.Color, opacities[len(opacities)-1])); err != nil {
 				return fmt.Errorf("paint: command %d stroke: %w", index, err)
 			}
@@ -198,10 +207,16 @@ func Replay(list DisplayList, painter Painter) error {
 			if command.Sides & ^BorderAll != 0 || !validRect(command.Rect) || !finite(command.Width) || command.Width < 0 {
 				return fmt.Errorf("paint: command %d has invalid border", index)
 			}
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.DrawBorder(command.Rect, command.Radii, command.Width, withOpacity(command.Color, opacities[len(opacities)-1]), command.Sides, command.Dashed); err != nil {
 				return fmt.Errorf("paint: command %d border: %w", index, err)
 			}
 		case CommandFillStrokeRoundedRect:
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.FillStrokeRoundedRect(command.Rect, command.Radii, command.Width,
 				withOpacity(command.Color, opacities[len(opacities)-1]),
 				withOpacity(command.BorderColor, opacities[len(opacities)-1])); err != nil {
@@ -212,6 +227,9 @@ func Replay(list DisplayList, painter Painter) error {
 			if !valid || pixels > math.MaxInt || int64(len(command.Text.Pixels)) != pixels {
 				return fmt.Errorf("paint: command %d has invalid text bitmap", index)
 			}
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.DrawText(command.Rect, command.Text, withOpacity(command.Color, opacities[len(opacities)-1])); err != nil {
 				return fmt.Errorf("paint: command %d text: %w", index, err)
 			}
@@ -219,6 +237,9 @@ func Replay(list DisplayList, painter Painter) error {
 			pixels, valid := intPixelBytes(command.Text, 1)
 			if !valid || pixels > math.MaxInt || int64(len(command.Text.Pixels)) != pixels {
 				return fmt.Errorf("paint: command %d has invalid icon mask", index)
+			}
+			if clipsEmpty(clips) {
+				continue
 			}
 			if err := painter.DrawIcon(command.Rect, command.Text, withOpacity(command.Color, opacities[len(opacities)-1])); err != nil {
 				return fmt.Errorf("paint: command %d icon: %w", index, err)
@@ -232,6 +253,9 @@ func Replay(list DisplayList, painter Painter) error {
 			if command.ImageClip != (Rect{}) && !validRect(command.ImageClip) {
 				return fmt.Errorf("paint: command %d has invalid image clip", index)
 			}
+			if clipsEmpty(clips) {
+				continue
+			}
 			if err := painter.DrawImage(command.Rect, command.Image, alpha, command.ImageClip, command.Radii); err != nil {
 				return fmt.Errorf("paint: command %d image: %w", index, err)
 			}
@@ -243,6 +267,14 @@ func Replay(list DisplayList, painter Painter) error {
 		return fmt.Errorf("paint: unbalanced display list: opacity depth %d, clip depth %d", len(opacities)-1, len(clips))
 	}
 	return nil
+}
+
+// clipsEmpty reports whether the effective top-most clip excludes all pixels.
+// Replay keeps forwarding its stack operations to the backend, but it owns the
+// resulting no-draw semantics so a backend cannot reinterpret an empty clip as
+// clipping disabled.
+func clipsEmpty(clips []Rect) bool {
+	return len(clips) != 0 && (clips[len(clips)-1].Width <= 0 || clips[len(clips)-1].Height <= 0)
 }
 
 func intPixelBytes(bitmap *TextBitmap, channels int64) (int64, bool) {

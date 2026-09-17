@@ -114,6 +114,43 @@ func TestReplayComposesNestedOpacityClipAndOrder(t *testing.T) {
 	}
 }
 
+func TestReplaySuppressesDrawsInsideEmptyClipAndRestoresParent(t *testing.T) {
+	mask := &TextBitmap{Key: "mask", Width: 1, Height: 1, Pixels: []byte{255}}
+	image := &ImageBitmap{Key: "image", Width: 1, Height: 1, Pixels: []byte{1, 2, 3, 255}}
+	list := DisplayList{
+		{Kind: CommandPushClip, Rect: Rect{Width: 10, Height: 10}},
+		{Kind: CommandFillRoundedRect, Rect: Rect{Width: 10, Height: 10}, Color: Color{A: 255}},
+		{Kind: CommandPushClip, Rect: Rect{X: 20, Y: 20, Width: 10, Height: 10}},
+		{Kind: CommandDrawShadow, Rect: Rect{Width: 1, Height: 1}, Shadow: Shadow{Color: Color{A: 255}}},
+		{Kind: CommandFillRoundedRect, Rect: Rect{Width: 1, Height: 1}, Color: Color{A: 255}},
+		{Kind: CommandStrokeRoundedRect, Rect: Rect{Width: 1, Height: 1}, Width: 1, Color: Color{A: 255}},
+		{Kind: CommandBorder, Rect: Rect{Width: 1, Height: 1}, Width: 1, Color: Color{A: 255}},
+		{Kind: CommandFillStrokeRoundedRect, Rect: Rect{Width: 1, Height: 1}, Width: 1, Color: Color{A: 255}, BorderColor: Color{A: 255}},
+		{Kind: CommandDrawText, Rect: Rect{Width: 1, Height: 1}, Text: mask, Color: Color{A: 255}},
+		{Kind: CommandDrawIcon, Rect: Rect{Width: 1, Height: 1}, Text: mask, Color: Color{A: 255}},
+		{Kind: CommandDrawImage, Rect: Rect{Width: 1, Height: 1}, Image: image},
+		{Kind: CommandPopClip},
+		{Kind: CommandFillRoundedRect, Rect: Rect{Width: 1, Height: 1}, Color: Color{A: 255}},
+		{Kind: CommandPopClip},
+	}
+	recorder := &RecordingPainter{}
+	if err := Replay(list, recorder); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(recorder.Records), 6; got != want {
+		t.Fatalf("records = %#v, want %d records", recorder.Records, want)
+	}
+	for _, index := range []int{1, 4} {
+		if recorder.Records[index].Kind != CommandFillRoundedRect {
+			t.Fatalf("record %d = %#v, want visible fill", index, recorder.Records[index])
+		}
+	}
+	if recorder.Records[0].Kind != CommandPushClip || recorder.Records[2].Kind != CommandPushClip ||
+		recorder.Records[3].Kind != CommandPushClip || recorder.Records[5].Kind != CommandPopClip {
+		t.Fatalf("clip stack was not replayed: %#v", recorder.Records)
+	}
+}
+
 func TestReplayRejectsUnbalancedStacks(t *testing.T) {
 	for _, list := range []DisplayList{
 		{{Kind: CommandPopClip}},
