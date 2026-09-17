@@ -1,14 +1,28 @@
-<h1 align="left">
+<h1 align="center">
   <img src="https://dxui-org.github.io/brand/logo.png" alt="dxui" width="380">
 </h1>
 
-**A declarative desktop GUI framework for Go.**
+<p align="center">
+  <strong>A declarative desktop GUI framework for Go.</strong>
+</p>
 
-[![Test](https://github.com/dxui-org/dxui/actions/workflows/ci.yml/badge.svg)](https://github.com/dxui-org/dxui/actions)
-[![GoDoc](https://pkg.go.dev/badge/github.com/dxui-org/dxui)](https://pkg.go.dev/github.com/dxui-org/dxui)
-[![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
+<p align="center">
+  <a href="https://github.com/dxui-org/dxui/actions">
+    <img src="https://github.com/dxui-org/dxui/actions/workflows/ci.yml/badge.svg" alt="Test">
+  </a>
+  <a href="https://pkg.go.dev/github.com/dxui-org/dxui">
+    <img src="https://pkg.go.dev/badge/github.com/dxui-org/dxui" alt="GoDoc">
+  </a>
+  <a href="https://opensource.org/license/mit">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License">
+  </a>
+</p>
 
-[Quick start](#quick-start) · [Examples](#examples) · [Documents](https://dxui-org.github.io/)
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#examples">Examples</a> ·
+  <a href="https://dxui-org.github.io/">Documents</a>
+</p>
 
 <p align="center">
   <img src="https://dxui-org.github.io/images/component-examples-light.png" alt="dxui component examples" width="900">
