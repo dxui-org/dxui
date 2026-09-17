@@ -10,6 +10,10 @@
 
 [Quick start](#quick-start) · [Examples](#examples) · [Documents](https://dxui-org.github.io/)
 
+<p align="center">
+  <img src="https://dxui-org.github.io/images/component-examples-light.png" alt="dxui component examples" width="900">
+</p>
+
 ## Highlights
 
 - **Write your UI in Go.** Compose immutable `View` descriptions with typed
