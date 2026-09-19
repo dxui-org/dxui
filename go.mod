@@ -3,7 +3,7 @@ module github.com/dxui-org/dxui
 go 1.25.0
 
 require (
-	github.com/dxui-org/go-sdl3 v0.1.2
+	github.com/dxui-org/go-sdl3 v0.1.3
 	golang.org/x/image v0.38.0
 )
 

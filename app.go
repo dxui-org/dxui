@@ -274,6 +274,8 @@ func (a *App) Run(root func() View) (runErr error) {
 		a.releaseTextEngine()
 		a.refreshResourceDiagnostics()
 	}()
+	interrupts := startInterruptHandler(a, processSignalNotifier{})
+	defer interrupts.Stop()
 
 	width, err := logicalDimension("width", window.Width, 800)
 	if err != nil {
