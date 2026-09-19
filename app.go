@@ -896,6 +896,8 @@ func (a *App) handleEvent(event platform.Event) (bool, bool, error) {
 		return false, false, err
 	}
 	switch event.Kind {
+	case platform.EventExpose:
+		return true, a.isClosed(), nil
 	case platform.EventDeadline:
 		dirty, err := a.handleDeadlines()
 		return dirty, a.isClosed(), err

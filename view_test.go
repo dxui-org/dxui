@@ -400,6 +400,14 @@ func TestRunUpdateFailureReportsAndCanRecover(t *testing.T) {
 	}
 }
 
+func TestExposeRequestsPaint(t *testing.T) {
+	app := NewApp(AppOptions{})
+	dirty, closeApp, err := app.handleEvent(platform.Event{Kind: platform.EventExpose})
+	if err != nil || !dirty || closeApp {
+		t.Fatalf("expose result = dirty:%t close:%t err:%v", dirty, closeApp, err)
+	}
+}
+
 type frameTestEvents struct {
 	events []platform.Event
 	index  int
