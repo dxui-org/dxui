@@ -15,13 +15,13 @@ pane stays scrollable and wide previews gain horizontal scrolling.
 From the repository root:
 
 ```sh
-go run ./examples/components
-go run ./examples/components -software
-go run ./examples/components -component Textarea
-go run ./examples/components -component Popover
-go run ./examples/components -component Colors
-go run ./examples/components -component Theme
-go run ./examples/components -component Input -width 480 -height 420
+go run ./examples/component_gallery
+go run ./examples/component_gallery -software
+go run ./examples/component_gallery -component Textarea
+go run ./examples/component_gallery -component Popover
+go run ./examples/component_gallery -component Colors
+go run ./examples/component_gallery -component Theme
+go run ./examples/component_gallery -component Input -width 480 -height 420
 ```
 
 `-software` forces SDL's named software renderer. `-component` chooses the

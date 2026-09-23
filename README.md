@@ -59,7 +59,7 @@ From a local checkout of this repository:
 go run ./examples/components
 ```
 
-Explore the component catalog, or try a smaller application:
+Explore the component studio, or try a smaller application:
 
 ```sh
 go run ./examples/calc
@@ -156,7 +156,8 @@ Run any example from the repository root with `go run ./examples/<name>`.
 
 | Example | What it demonstrates |
 | --- | --- |
-| [components](examples/components) | Searchable component catalog, live properties, themes, and compositions |
+| [components](examples/components) | Screenshot-ready interactive component studio |
+| [component_gallery](examples/component_gallery) | Searchable component catalog, live properties, themes, and compositions |
 | [login](examples/login) | A complete login form and input interactions |
 | [calc](examples/calc) | An interactive calculator with light/dark themes |
 | [multi_window](examples/multi_window) | Independent child windows, state, and lifecycle |
