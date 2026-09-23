@@ -88,7 +88,7 @@ func (a *App) CreateWindow(options WindowOptions, root func() View) (*Window, er
 		bg = a.options.Background
 	}
 	if bg == (RGBAColor{}) {
-		bg = RGBA(28, 30, 36, 255)
+		bg = RGBA(248, 250, 252, 255)
 	}
 	title := options.Title
 	if title == "" {

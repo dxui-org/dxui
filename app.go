@@ -295,7 +295,7 @@ func (a *App) Run(root func() View) (runErr error) {
 	}
 	background := window.Background
 	if background == (RGBAColor{}) {
-		background = RGBA(28, 30, 36, 255)
+		background = RGBA(248, 250, 252, 255)
 	}
 	if window.Title == "" {
 		window.Title = "dxui"

@@ -12,7 +12,7 @@ import (
 func main() {
 	app := dxui.NewApp(dxui.AppOptions{
 		Title: "dxui layout gallery", Width: 760, Height: 520,
-		Background: dxui.RGBA(20, 23, 30, 255),
+		Background: dxui.RGBA(248, 250, 252, 255),
 	})
 	if err := app.Run(func() dxui.View {
 		return gallery()

@@ -23,7 +23,7 @@ func main() {
 	options := dxui.AppOptions{
 		Title: "dxui minimal", Width: 640, Height: 400,
 		MinWidth: 320, MinHeight: 200,
-		Background: dxui.RGBA(28, 30, 36, 255), Renderer: preference,
+		Background: dxui.RGBA(248, 250, 252, 255), Renderer: preference,
 	}
 	options.OnShown = func(app *dxui.App) {
 		if *duration > 0 {
