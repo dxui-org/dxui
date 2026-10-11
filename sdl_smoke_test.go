@@ -56,17 +56,30 @@ func runSDLRuntimeSmoke(mode string) error {
 		preference = RendererSoftware
 		wantName = "software"
 	}
+	shown, childShown := 0, 0
+	var startupErr error
 	app := NewApp(AppOptions{
 		Title: "dxui SDL smoke", Width: 320, Height: 200,
 		Background: RGBA(12, 34, 56, 255), Renderer: preference,
+		OnShown: func(app *App) {
+			defer app.Close()
+			shown++
+			if app.Diagnostics().FrameCount != 1 {
+				startupErr = fmt.Errorf("main OnShown ran before its first submitted frame")
+				return
+			}
+			_, startupErr = app.CreateWindow(WindowOptions{
+				Title: "dxui SDL child smoke", Width: 200, Height: 120,
+				OnShown: func(window *Window) {
+					childShown++
+					if diagnostics := window.Diagnostics(); diagnostics.FrameCount != 1 || diagnostics.RendererName == "" || (wantName != "" && diagnostics.RendererName != wantName) {
+						panic(fmt.Sprintf("child OnShown diagnostics: %+v", diagnostics))
+					}
+				},
+			}, func() View { return Label("child startup") })
+		},
 	})
-	ready := make(chan struct{})
 	root := func() View {
-		select {
-		case <-ready:
-		default:
-			close(ready)
-		}
 		return Scroll(ScrollProps{Axis: ScrollVertical, InitialOffset: Some(Point{Y: 8})},
 			Box(BoxProps{},
 				Select(SelectProps{Key: "smoke-select", Value: "a", Options: []SelectOption{
@@ -78,16 +91,14 @@ func runSDLRuntimeSmoke(mode string) error {
 			),
 		)
 	}
-	updateErr := make(chan error, 1)
-	go func() {
-		<-ready
-		updateErr <- app.Update(app.Close)
-	}()
 	if err := app.Run(root); err != nil {
 		return err
 	}
-	if err := <-updateErr; err != nil {
-		return err
+	if startupErr != nil {
+		return startupErr
+	}
+	if shown != 1 || childShown != 1 {
+		return fmt.Errorf("shown callbacks = %d/%d, want one per window", shown, childShown)
 	}
 	diagnostics := app.Diagnostics()
 	fmt.Printf("renderer=%s SDL=%s logical=%+v pixel=%+v density=%.3f display-scale=%.3f frames=%d fallback=%v\n",

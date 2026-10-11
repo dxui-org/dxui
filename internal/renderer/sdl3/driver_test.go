@@ -103,6 +103,8 @@ type fakeWindow struct {
 	viewportValue platform.Viewport
 	textArea      backend.TextInputArea
 	showErr       error
+	shown         bool
+	renderer      *fakeNativeRenderer
 }
 
 func (*fakeWindow) id() (uint32, error)   { return 1, nil }
@@ -116,7 +118,8 @@ func (window *fakeWindow) createRenderer(name string) (nativeRenderer, error) {
 	if err := window.rendererErrs[name]; err != nil {
 		return nil, err
 	}
-	return &fakeNativeRenderer{api: window.api, nameValue: name}, nil
+	window.renderer = &fakeNativeRenderer{api: window.api, nameValue: name}
+	return window.renderer, nil
 }
 func (window *fakeWindow) setMinimumSize(int32, int32) error {
 	window.api.record("minimum-size")
@@ -133,7 +136,16 @@ func (window *fakeWindow) viewport() (platform.Viewport, error) {
 	window.api.record("viewport")
 	return window.viewportValue, nil
 }
-func (window *fakeWindow) show() error           { window.api.record("show-window"); return window.showErr }
+func (window *fakeWindow) show() error {
+	window.api.record("show-window")
+	if window.showErr != nil {
+		return window.showErr
+	}
+	window.shown = true
+	// A show transition need not preserve the hidden window's backbuffer.
+	window.renderer.fills = 0
+	return nil
+}
 func (window *fakeWindow) destroy()              { window.api.record("destroy-window") }
 func (window *fakeWindow) startTextInput() error { window.api.record("text-start"); return nil }
 func (window *fakeWindow) stopTextInput() error  { window.api.record("text-stop"); return nil }
@@ -157,6 +169,10 @@ type fakeNativeRenderer struct {
 	geometryTexture  bool
 	geometryVertices []nativeVertex
 	lastTexture      *fakeNativeTexture
+	clearErr         error
+	presentErr       error
+	fills            int
+	submittedFills   int
 }
 
 func (renderer *fakeNativeRenderer) name() (string, error) {
@@ -186,7 +202,11 @@ func (renderer *fakeNativeRenderer) setDrawBlendMode() error {
 	return nil
 }
 func (*fakeNativeRenderer) setClipRect(*nativeRect) error { return nil }
-func (*fakeNativeRenderer) fillRect(nativeFRect) error    { return nil }
+func (renderer *fakeNativeRenderer) fillRect(nativeFRect) error {
+	renderer.api.record("fill")
+	renderer.fills++
+	return nil
+}
 func (renderer *fakeNativeRenderer) renderGeometry(texture nativeTexture, vertices []nativeVertex, _ []int32) error {
 	renderer.geometryTexture = texture != nil
 	renderer.geometryVertices = append(renderer.geometryVertices[:0], vertices...)
@@ -198,9 +218,20 @@ func (renderer *fakeNativeRenderer) createTextTexture(int, int) (nativeTexture, 
 	return renderer.lastTexture, nil
 }
 func (*fakeNativeRenderer) renderTexture(nativeTexture, nativeFRect) error { return nil }
-func (*fakeNativeRenderer) clear() error                                   { return nil }
+func (renderer *fakeNativeRenderer) clear() error {
+	renderer.api.record("clear")
+	renderer.fills = 0
+	return renderer.clearErr
+}
 func (renderer *fakeNativeRenderer) present() error {
 	renderer.api.record("present")
+	if renderer.presentErr != nil {
+		return renderer.presentErr
+	}
+	// Hidden swaps can succeed without submitting any content.
+	if renderer.api.window.shown {
+		renderer.submittedFills = renderer.fills
+	}
 	return nil
 }
 func (renderer *fakeNativeRenderer) destroy() {
@@ -511,38 +542,7 @@ func TestResizeAndScaleEventsRefreshTypedViewport(t *testing.T) {
 	}
 }
 
-func TestWindowIsShownOnceAfterFirstCompletePresent(t *testing.T) {
-	api := newFakeAPI()
-	driver, err := openWithAPI(api, validConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer driver.Close()
-	if countAction(api.actions, "show-window") != 0 {
-		t.Fatalf("window shown during initialization: %v", api.actions)
-	}
-	if err := driver.Render(nil); err != nil {
-		t.Fatal(err)
-	}
-	if countAction(api.actions, "show-window") != 0 {
-		t.Fatalf("window shown before a complete present: %v", api.actions)
-	}
-	if err := driver.Present(); err != nil {
-		t.Fatal(err)
-	}
-	wantTail := []string{"present", "show-window"}
-	if got := api.actions[len(api.actions)-len(wantTail):]; !reflect.DeepEqual(got, wantTail) {
-		t.Fatalf("first-frame tail = %v, want %v", got, wantTail)
-	}
-	if err := driver.Present(); err != nil {
-		t.Fatal(err)
-	}
-	if countAction(api.actions, "show-window") != 1 || countAction(api.actions, "present") != 2 {
-		t.Fatalf("present/show counts are not one-shot: %v", api.actions)
-	}
-}
-
-func TestWindowShowFailureStopsAfterPresentedFrame(t *testing.T) {
+func TestWindowShowFailureStopsBeforePresent(t *testing.T) {
 	api := newFakeAPI()
 	api.window.showErr = errors.New("show failed")
 	driver, err := openWithAPI(api, validConfig())
@@ -550,13 +550,110 @@ func TestWindowShowFailureStopsAfterPresentedFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer driver.Close()
-	err = driver.Present()
-	if !errors.Is(err, api.window.showErr) {
-		t.Fatalf("present error = %v, want show failure", err)
+	if err := driver.Present(); !errors.Is(err, api.window.showErr) {
+		t.Fatalf("error = %v, want show failure", err)
 	}
-	wantTail := []string{"present", "show-window"}
-	if got := api.actions[len(api.actions)-len(wantTail):]; !reflect.DeepEqual(got, wantTail) {
-		t.Fatalf("failed first-frame tail = %v, want %v", got, wantTail)
+	if driver.shown || driver.Diagnostics().Frames != 0 || countAction(api.actions, "present") != 0 {
+		t.Fatalf("show failure continued to present: %v", api.actions)
+	}
+}
+
+func TestFirstPresentSubmitsContentWithoutExpose(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		open func(nativeAPI, Config) (*Driver, error)
+	}{
+		{"main", openWithAPI},
+		{"child", openWindowWithAPI},
+	} {
+		for _, software := range []bool{false, true} {
+			name := test.name + "/default"
+			if software {
+				name = test.name + "/software"
+			}
+			t.Run(name, func(t *testing.T) {
+				api := newFakeAPI()
+				config := validConfig()
+				config.Software = software
+				driver, err := test.open(api, config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if test.name == "child" {
+					driver.owner = &Driver{retiredWindowIDs: make(map[uint32]struct{})}
+				}
+				defer driver.Close()
+				list := paint.DisplayList{{Kind: paint.CommandFillRoundedRect, Rect: paint.Rect{Width: 20, Height: 10}, Color: paint.Color{A: 255}}}
+				if err := driver.Render(list); err != nil {
+					t.Fatal(err)
+				}
+				if api.window.shown {
+					t.Fatal("preparation showed window")
+				}
+				api.actions = nil
+				if err := driver.Present(); err != nil {
+					t.Fatal(err)
+				}
+				if api.window.renderer.submittedFills != 1 || driver.Diagnostics().Frames != 1 {
+					t.Fatalf("first present did not submit prepared content: %v", api.actions)
+				}
+				if driver.firstFrame != nil {
+					t.Fatal("startup retained the display list")
+				}
+				want := []string{"show-window", "set-color", "clear", "set-color", "fill", "present"}
+				if !reflect.DeepEqual(api.actions, want) {
+					t.Fatalf("startup actions = %v, want %v", api.actions, want)
+				}
+				api.actions = nil
+				if err := driver.Render(list); err != nil {
+					t.Fatal(err)
+				}
+				if err := driver.Present(); err != nil {
+					t.Fatal(err)
+				}
+				if countAction(api.actions, "show-window") != 0 || countAction(api.actions, "clear") != 1 || countAction(api.actions, "present") != 1 {
+					t.Fatalf("ordinary frame repeated startup: %v", api.actions)
+				}
+			})
+		}
+	}
+}
+
+func TestFirstFrameFailureDoesNotCountPresent(t *testing.T) {
+	for _, stage := range []string{"preparation", "replay", "present"} {
+		t.Run(stage, func(t *testing.T) {
+			api := newFakeAPI()
+			driver, err := openWithAPI(api, validConfig())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer driver.Close()
+			wantErr := errors.New(stage + " failed")
+			if stage == "preparation" {
+				api.window.renderer.clearErr = wantErr
+			}
+			err = driver.Render(nil)
+			if stage != "preparation" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if stage == "replay" {
+					api.window.renderer.clearErr = wantErr
+				} else {
+					api.window.renderer.presentErr = wantErr
+				}
+				err = driver.Present()
+			}
+			if !errors.Is(err, wantErr) || driver.Diagnostics().Frames != 0 {
+				t.Fatalf("error=%v frames=%d", err, driver.Diagnostics().Frames)
+			}
+			if stage == "preparation" && api.window.shown {
+				t.Fatal("failed preparation showed window")
+			}
+			if stage != "present" && countAction(api.actions, "present") != 0 {
+				t.Fatalf("failure continued to present: %v", api.actions)
+			}
+		})
 	}
 }
 

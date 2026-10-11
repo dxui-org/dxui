@@ -149,6 +149,7 @@ type Driver struct {
 	performanceCounters bool
 	softwareRenderer    bool
 	shown               bool
+	firstFrame          paint.DisplayList
 	logicalID           platform.WindowID
 	nativeID            uint32
 	owner               *Driver
@@ -580,6 +581,7 @@ func (driver *Driver) Close() error {
 	clear(driver.activeImage)
 	clear(driver.nextText)
 	clear(driver.nextImage)
+	driver.firstFrame = nil
 	driver.refreshCacheDiagnostics()
 	driver.renderer.destroy()
 	driver.window.destroy()
@@ -612,6 +614,10 @@ func (driver *Driver) Render(list paint.DisplayList) error {
 		return fmt.Errorf("sdl3: render display list: %w", err)
 	}
 	driver.refreshCacheDiagnostics()
+	if !driver.shown {
+		// Borrow the immutable list until Present completes the show transition.
+		driver.firstFrame = list
+	}
 	return nil
 }
 
@@ -665,14 +671,21 @@ func (driver *Driver) syncTextureReferences(list paint.DisplayList) {
 }
 
 func (driver *Driver) Present() error {
-	if err := driver.renderer.present(); err != nil {
-		return fmt.Errorf("sdl3: render present: %w", err)
-	}
 	if !driver.shown {
 		if err := driver.window.show(); err != nil {
-			return fmt.Errorf("sdl3: window show after first frame: %w", err)
+			return fmt.Errorf("sdl3: window show before first present: %w", err)
 		}
 		driver.shown = true
+		list := driver.firstFrame
+		driver.firstFrame = nil
+		// Wayland skips hidden swaps and may not send a startup expose. Show
+		// can also invalidate the prepared backbuffer, so replay before swapping.
+		if err := driver.Render(list); err != nil {
+			return fmt.Errorf("sdl3: render first shown frame: %w", err)
+		}
+	}
+	if err := driver.renderer.present(); err != nil {
+		return fmt.Errorf("sdl3: render present: %w", err)
 	}
 	driver.mu.Lock()
 	driver.diagnostics.Frames++
