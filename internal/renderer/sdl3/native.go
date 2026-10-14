@@ -97,12 +97,7 @@ func translateNativeEvent(event *sdl.Event) nativeEvent {
 		}
 		return nativeEvent{kind: kind, windowID: uint32(value.WindowID), x: value.X, y: value.Y, button: mouseButton(value.Button), clicks: value.Clicks}
 	case sdl.EVENT_MOUSE_WHEEL:
-		value := event.MouseWheelEvent()
-		wheelX, wheelY := value.X, value.Y
-		if value.Direction == sdl.MOUSEWHEEL_FLIPPED {
-			wheelX, wheelY = -wheelX, -wheelY
-		}
-		return nativeEvent{kind: nativeEventMouseWheel, windowID: uint32(value.WindowID), x: value.MouseX, y: value.MouseY, wheelX: wheelX, wheelY: wheelY}
+		return translateMouseWheelEvent(*event.MouseWheelEvent())
 	case sdl.EVENT_KEY_DOWN, sdl.EVENT_KEY_UP:
 		value := event.KeyboardEvent()
 		kind := nativeEventKeyDown
@@ -139,6 +134,16 @@ func translateNativeEvent(event *sdl.Event) nativeEvent {
 		return nativeEvent{kind: nativeEventTextInput, windowID: uint32(value.WindowID), text: value.Text}
 	default:
 		return nativeEvent{kind: nativeEventOther}
+	}
+}
+
+func translateMouseWheelEvent(value sdl.MouseWheelEvent) nativeEvent {
+	// SDL has already applied the platform's natural/traditional scrolling
+	// direction to X and Y. Direction only describes that choice; negating a
+	// FLIPPED event here would undo the system setting.
+	return nativeEvent{
+		kind: nativeEventMouseWheel, windowID: uint32(value.WindowID),
+		x: value.MouseX, y: value.MouseY, wheelX: value.X, wheelY: value.Y,
 	}
 }
 
