@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/dxui-org/dxui/internal/backend"
 )
 
 func TestMain(m *testing.M) {
@@ -64,6 +66,11 @@ func runSDLRuntimeSmoke(mode string) error {
 		OnShown: func(app *App) {
 			defer app.Close()
 			shown++
+			for _, cursor := range []backend.Cursor{backend.CursorText, backend.CursorDefault, backend.CursorText, backend.CursorDefault} {
+				if startupErr = app.setPointerCursor(cursor); startupErr != nil {
+					return
+				}
+			}
 			if app.Diagnostics().FrameCount != 1 {
 				startupErr = fmt.Errorf("main OnShown ran before its first submitted frame")
 				return

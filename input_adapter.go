@@ -741,6 +741,9 @@ func (a *App) refreshInteraction(view View, instance *tree.Node, geometry *layou
 	a.inputActions = actions
 	a.mu.Unlock()
 	editorsChanged := a.syncEditors(actions)
+	if err := a.syncPointerCursor(); err != nil {
+		return changed || editorsChanged, err
+	}
 	return changed || editorsChanged, nil
 }
 
@@ -781,6 +784,9 @@ func (a *App) reconcileScrollDrag(actions map[uint64]inputAction) {
 }
 
 func (a *App) handleInteraction(event platform.Event) (bool, error) {
+	if err := a.updatePointerCursor(event); err != nil {
+		return false, err
+	}
 	if event.Kind == platform.EventKeyDown || event.Kind == platform.EventKeyUp {
 		a.modifiers = event.Key.Modifiers
 	}

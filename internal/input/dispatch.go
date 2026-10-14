@@ -226,6 +226,14 @@ func (c *Controller) State(id uint64) (hovered, pressed, focused, focusVisible b
 
 func (c *Controller) Focused() uint64 { return c.focus }
 
+// TargetAt returns the topmost eligible pointer target without changing focus.
+func (c *Controller) TargetAt(x, y float32) uint64 {
+	if !finitePoint(x, y) {
+		return 0
+	}
+	return c.hit(x, y)
+}
+
 // Focus moves focus to a live eligible identity. It is used by typed overlay
 // dismissal to restore the trigger without exposing a public focus API.
 func (c *Controller) Focus(id uint64, visible bool) bool {

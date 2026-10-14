@@ -88,6 +88,17 @@ type MultiWindowRuntime interface {
 	CreateWindow(WindowConfig) (platform.WindowID, WindowRuntime, error)
 }
 
+// Cursor is a backend-neutral system pointer shape.
+type Cursor uint8
+
+const (
+	CursorDefault Cursor = iota
+	CursorText
+)
+
+// CursorRuntime sets the native pointer on the UI thread.
+type CursorRuntime interface{ SetCursor(Cursor) error }
+
 // TextInputRuntime is implemented by runtimes that own a native text-input
 // service. It is separate so headless renderer fakes remain minimal.
 type TextInputRuntime interface{ TextInput() TextInput }

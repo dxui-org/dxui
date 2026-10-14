@@ -121,6 +121,8 @@ type App struct {
 	resourceCacheBytes, resourceCacheBudget, resourceCacheEntries uint64
 	fontResources, imageResources                                 uint64
 	interaction                                                   internalinput.Controller
+	cursorX, cursorY                                              float32
+	cursorKnown                                                   bool
 	inputActions                                                  map[uint64]inputAction
 	editors                                                       map[uint64]*retainedEditor
 	focusedEditor                                                 uint64
@@ -1202,6 +1204,9 @@ func (a *App) commitView(view View) (tree.Changes, error) {
 	}
 	a.mu.Unlock()
 	a.refreshResourceDiagnostics()
+	if err := a.syncPointerCursor(); err != nil {
+		return changes, err
+	}
 	if a.nativeTextActive {
 		focusedAction, textFocused := actions[a.interaction.Focused()]
 		if !textFocused || !focusedAction.editor || focusedAction.disabled {

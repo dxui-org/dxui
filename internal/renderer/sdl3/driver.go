@@ -158,6 +158,7 @@ type Driver struct {
 	retiredWindowIDs    map[uint32]struct{}
 	nextWindowID        platform.WindowID
 	ownsSDL             bool
+	cursors             cursorState
 }
 
 var runtimeOwner sync.Mutex
@@ -599,6 +600,7 @@ func (driver *Driver) Close() error {
 		delete(driver.windows, nativeID)
 		_ = child.Close()
 	}
+	driver.closeCursors()
 	driver.api.quit()
 	if err := driver.library.unload(); err != nil {
 		return fmt.Errorf("sdl3: unload: %w", err)
