@@ -45,6 +45,7 @@ type fakeAPI struct {
 	actions      []string
 	window       *fakeWindow
 	loadErr      error
+	signalErr    error
 	initErr      error
 	versionValue string
 	mainThread   bool
@@ -75,7 +76,11 @@ func (api *fakeAPI) load() (nativeLibrary, error) {
 	}
 	return fakeLibrary{api: api}, nil
 }
-func (api *fakeAPI) version() string    { api.record("version"); return api.versionValue }
+func (api *fakeAPI) version() string { api.record("version"); return api.versionValue }
+func (api *fakeAPI) disableSignalHandlers() error {
+	api.record("disable-signal-handlers")
+	return api.signalErr
+}
 func (api *fakeAPI) init() error        { api.record("init"); return api.initErr }
 func (api *fakeAPI) quit()              { api.record("quit") }
 func (api *fakeAPI) isMainThread() bool { api.record("main-thread"); return api.mainThread }
@@ -283,6 +288,33 @@ func TestLoadFailureStopsBeforeSDLInitialization(t *testing.T) {
 	}
 	if !reflect.DeepEqual(api.actions, []string{"load"}) {
 		t.Fatalf("actions = %v, want load only", api.actions)
+	}
+}
+
+func TestSignalHandlersAreDisabledBeforeSDLInitialization(t *testing.T) {
+	api := newFakeAPI()
+	driver, err := openWithAPI(api, validConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer driver.Close()
+
+	wantPrefix := []string{"load", "version", "disable-signal-handlers", "init"}
+	if got := api.actions[:len(wantPrefix)]; !reflect.DeepEqual(got, wantPrefix) {
+		t.Fatalf("startup actions = %v, want prefix %v", api.actions, wantPrefix)
+	}
+}
+
+func TestSignalHandlerConfigurationFailureStopsBeforeSDLInitialization(t *testing.T) {
+	api := newFakeAPI()
+	api.signalErr = errors.New("hint rejected")
+	_, err := openWithAPI(api, validConfig())
+	if !errors.Is(err, api.signalErr) {
+		t.Fatalf("error = %v, want signal configuration error", err)
+	}
+	want := []string{"load", "version", "disable-signal-handlers", "unload"}
+	if !reflect.DeepEqual(api.actions, want) {
+		t.Fatalf("actions = %v, want %v", api.actions, want)
 	}
 }
 

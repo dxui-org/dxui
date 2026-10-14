@@ -25,7 +25,10 @@ func (systemAPI) load() (nativeLibrary, error) {
 	return embeddedLibrary{unloadFunc: library.Unload}, nil
 }
 
-func (systemAPI) version() string                     { return sdl.GetVersion().String() }
+func (systemAPI) version() string { return sdl.GetVersion().String() }
+func (systemAPI) disableSignalHandlers() error {
+	return sdl.SetHintWithPriority(sdl.HINT_NO_SIGNAL_HANDLERS, "1", sdl.HINT_OVERRIDE)
+}
 func (systemAPI) init() error                         { return sdl.Init(sdl.INIT_VIDEO | sdl.INIT_EVENTS) }
 func (systemAPI) quit()                               { sdl.Quit() }
 func (systemAPI) isMainThread() bool                  { return sdl.IsMainThread() }

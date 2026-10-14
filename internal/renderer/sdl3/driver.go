@@ -73,6 +73,7 @@ type nativeEvent struct {
 type nativeAPI interface {
 	load() (nativeLibrary, error)
 	version() string
+	disableSignalHandlers() error
 	init() error
 	quit()
 	isMainThread() bool
@@ -240,6 +241,9 @@ func openWithAPI(api nativeAPI, config Config) (_ *Driver, err error) {
 	driver.diagnostics.SDLVersion = version
 	if version != RequiredSDLVersion {
 		return nil, fmt.Errorf("sdl3: load: native version %s, require %s", version, RequiredSDLVersion)
+	}
+	if err := api.disableSignalHandlers(); err != nil {
+		return nil, fmt.Errorf("sdl3: disable native signal handlers: %w", err)
 	}
 	initAttempted = true
 	if err := api.init(); err != nil {
