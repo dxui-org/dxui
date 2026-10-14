@@ -263,6 +263,55 @@ func TestShadowGeometryCacheIsScaleKeyedAndByteBounded(t *testing.T) {
 	}
 }
 
+func TestShadowGeometryUsesGaussianFalloffWithoutAlphaStacking(t *testing.T) {
+	const sourceAlpha = uint8(72)
+	layers := makeShadowGeometry(shadowKey{Width: 40, Height: 32, Blur: 8, Spread: 2, ScaleX: 1, ScaleY: 1})
+	if len(layers) != shadowLayers {
+		t.Fatalf("shadow layers = %d, want %d", len(layers), shadowLayers)
+	}
+	if got := -layers[0].Rect.X; abs32(got-10) > 1e-5 {
+		t.Fatalf("outer expansion = %g, want 10", got)
+	}
+	core := layers[len(layers)-1]
+	if got := -core.Rect.X; got != -6 || core.Coverage != 1 {
+		t.Fatalf("inner expansion/coverage = %g/%g, want -6/1", got, core.Coverage)
+	}
+	for index := 1; index < len(layers); index++ {
+		if layers[index].Rect.X <= layers[index-1].Rect.X {
+			t.Fatalf("layer %d expansion did not decrease: %g then %g", index, -layers[index-1].Rect.X, -layers[index].Rect.X)
+		}
+		if layers[index].Coverage <= layers[index-1].Coverage {
+			t.Fatalf("layer %d coverage did not increase: %g then %g", index, layers[index-1].Coverage, layers[index].Coverage)
+		}
+	}
+	if layers[0].Coverage >= .03 || layers[3].Coverage < .49 || layers[3].Coverage > .51 {
+		t.Fatalf("outer/edge Gaussian coverage = %g/%g", layers[0].Coverage, layers[3].Coverage)
+	}
+
+	accumulated := float64(0)
+	edge := float64(0)
+	for index, layer := range layers {
+		alpha := shadowLayerAlpha(sourceAlpha, layer.Coverage, accumulated)
+		accumulated += (1 - accumulated) * float64(alpha) / 255
+		if index == 3 {
+			edge = accumulated
+		}
+	}
+	if got := edge * 255; got < 34 || got > 38 {
+		t.Fatalf("edge alpha = %g, want approximately half of %d", got, sourceAlpha)
+	}
+	if got := accumulated * 255; got < 71 || got > 73 {
+		t.Fatalf("inner alpha = %g, want %d", got, sourceAlpha)
+	}
+}
+
+func TestUnblurredShadowRetainsSolidSpread(t *testing.T) {
+	layers := makeShadowGeometry(shadowKey{Width: 20, Height: 12, Spread: 3})
+	if len(layers) != 1 || -layers[0].Rect.X != 3 || layers[0].Coverage != 1 {
+		t.Fatalf("unblurred layers = %+v", layers)
+	}
+}
+
 func TestTextTextureCacheHitsEvictsAndReleases(t *testing.T) {
 	api := newFakeAPI()
 	native := &fakeNativeRenderer{api: api}

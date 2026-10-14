@@ -37,9 +37,9 @@ type shadowKey struct {
 }
 
 type shadowLayer struct {
-	Rect  paint.Rect
-	Radii paint.Radii
-	Alpha float32
+	Rect     paint.Rect
+	Radii    paint.Radii
+	Coverage float32
 }
 
 type shadowGeometry []shadowLayer
@@ -71,9 +71,15 @@ func (driver *Driver) DrawShadow(rect paint.Rect, radii paint.Radii, shadow pain
 		layers = makeShadowGeometry(key)
 		driver.shadowCache.Put(key, layers, shadowGeometryBytes(len(layers)))
 	}
+	accumulatedAlpha := float64(0)
 	for _, layer := range layers {
 		color := shadow.Color
-		color.A = uint8(math.Round(float64(color.A) * float64(layer.Alpha)))
+		color.A = shadowLayerAlpha(shadow.Color.A, layer.Coverage, accumulatedAlpha)
+		if color.A == 0 {
+			continue
+		}
+		layerAlpha := float64(color.A) / 255
+		accumulatedAlpha += (1 - accumulatedAlpha) * layerAlpha
 		drawRect := layer.Rect
 		drawRect.X += rect.X + shadow.OffsetX
 		drawRect.Y += rect.Y + shadow.OffsetY
@@ -89,24 +95,48 @@ func shadowGeometryBytes(layers int) int {
 }
 
 func makeShadowGeometry(key shadowKey) shadowGeometry {
-	count := 1
-	if key.Blur > 0 {
-		count = shadowLayers
+	result := make(shadowGeometry, 0, shadowLayers)
+	if key.Blur <= 0 {
+		return appendShadowLayer(result, key, key.Spread, 1)
 	}
-	result := make(shadowGeometry, 0, count)
-	for index := 0; index < count; index++ {
-		fraction := float32(index+1) / float32(count)
-		expansion := key.Spread + key.Blur*(1-fraction)
-		alpha := float32(1)
-		if count > 1 {
-			alpha = 1 / float32(count)
+	for index := 0; index < shadowLayers; index++ {
+		// Signed quadratic spacing spends the bounded shell budget near both
+		// sides of the edge. Blur is the three-sigma cutoff distance.
+		fraction := 1 - 2*float64(index)/float64(shadowLayers-1)
+		distance := float64(key.Blur) * math.Copysign(fraction*fraction, fraction)
+		coverage := float64(1)
+		if index+1 < shadowLayers {
+			nextFraction := 1 - 2*float64(index+1)/float64(shadowLayers-1)
+			nextDistance := float64(key.Blur) * math.Copysign(nextFraction*nextFraction, nextFraction)
+			sampleDistance := (distance + nextDistance) / 2
+			coverage = .5 * math.Erfc(3*sampleDistance/(math.Sqrt2*float64(key.Blur)))
 		}
-		result = append(result, shadowLayer{
-			Rect:  paint.Rect{X: -expansion, Y: -expansion, Width: key.Width + 2*expansion, Height: key.Height + 2*expansion},
-			Radii: addRadius(key.Radii, expansion), Alpha: alpha,
-		})
+		result = appendShadowLayer(result, key, key.Spread+float32(distance), float32(coverage))
 	}
 	return result
+}
+
+func appendShadowLayer(result shadowGeometry, key shadowKey, expansion, coverage float32) shadowGeometry {
+	width, height := key.Width+2*expansion, key.Height+2*expansion
+	if width <= 0 || height <= 0 {
+		return result
+	}
+	return append(result, shadowLayer{
+		Rect:     paint.Rect{X: -expansion, Y: -expansion, Width: width, Height: height},
+		Radii:    addRadius(key.Radii, expansion),
+		Coverage: coverage,
+	})
+}
+
+func shadowLayerAlpha(source uint8, coverage float32, accumulated float64) uint8 {
+	target := float64(source) / 255 * float64(coverage)
+	if target <= accumulated || accumulated >= 1 {
+		return 0
+	}
+	// Solve source-over for the alpha that reaches target after the outer
+	// shells already contributed accumulated coverage.
+	alpha := (target - accumulated) / (1 - accumulated)
+	return uint8(math.Round(255 * min(1, alpha)))
 }
 
 func (driver *Driver) FillRoundedRect(rect paint.Rect, radii paint.Radii, color paint.Color, joined paint.JoinedEdges) error {
