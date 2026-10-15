@@ -41,24 +41,25 @@ func TestCursorSharedAcrossWindowsAndDestroyedBeforeQuit(t *testing.T) {
 	}{
 		{driver, backend.CursorText}, {driver, backend.CursorText},
 		{child, backend.CursorDefault}, {driver, backend.CursorText},
+		{child, backend.CursorPointer}, {driver, backend.CursorPointer},
 	} {
 		if err := step.driver.SetCursor(step.cursor); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if api.creates != 2 || api.sets != 3 {
+	if api.creates != 3 || api.sets != 4 {
 		t.Fatalf("creates/sets = %d/%d", api.creates, api.sets)
 	}
 	if err := driver.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if api.destroys != 2 {
+	if api.destroys != 3 {
 		t.Fatalf("destroyed = %d", api.destroys)
 	}
 	if err := driver.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if api.destroys != 2 {
+	if api.destroys != 3 {
 		t.Fatal("cursors destroyed twice")
 	}
 }
@@ -76,5 +77,16 @@ func TestCursorFailureCanRetry(t *testing.T) {
 	}
 	if api.creates != 1 || api.sets != 2 {
 		t.Fatal("failed set prevented retry or recreated cursor")
+	}
+}
+
+func TestInvalidCursorDoesNotCreateNativeResource(t *testing.T) {
+	api := &cursorAPI{fakeAPI: newFakeAPI()}
+	driver := &Driver{api: api}
+	if err := driver.SetCursor(backend.Cursor(255)); err == nil {
+		t.Fatal("invalid shape accepted")
+	}
+	if api.creates != 0 || api.sets != 0 {
+		t.Fatal("invalid shape touched native cursors")
 	}
 }

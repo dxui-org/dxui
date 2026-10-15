@@ -175,7 +175,23 @@ const (
 	JustifySpaceBetween
 )
 
-// Style contains the supported layout, paint, and typography controls. Box
+// Cursor selects the system pointer shown while hovering a component.
+type Cursor uint8
+
+const (
+	// CursorAuto uses the component default: text for editors, pointer for Button,
+	// and the default arrow for other controls. Decorative children follow the
+	// enclosing control unless they explicitly select a cursor.
+	CursorAuto Cursor = iota
+	// CursorDefault selects the default arrow.
+	CursorDefault
+	// CursorText selects the text I-beam.
+	CursorText
+	// CursorPointer selects the pointing hand used for clickable buttons.
+	CursorPointer
+)
+
+// Style contains the supported layout, paint, typography, and cursor controls. Box
 // is always single-line; there is intentionally no wrap or order
 // property. The zero value is safe and selects intrinsic sizing and theme
 // defaults.
@@ -200,7 +216,9 @@ type Style struct {
 	Shadow     []Shadow
 	Opacity    Option[float32]
 	Visibility Visibility
-	Text       TextStyle
+	// Cursor affects hover appearance only; it adds no focus or activation behavior.
+	Cursor Cursor
+	Text   TextStyle
 	// Force is applied after component and interaction-state styles. It is for
 	// deliberate paint overrides such as suppressing a focus ring; ordinary
 	// base appearance belongs in the fields above so Hover/Pressed/Focus remain

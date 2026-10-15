@@ -26,18 +26,7 @@ func (a *App) syncPointerCursor() error {
 	if !a.cursorKnown {
 		return nil
 	}
-	cursor := backend.CursorDefault
-	id := a.interaction.TargetAt(a.cursorX, a.cursorY)
-	if action := a.inputActions[id]; action.editor && !action.disabled {
-		cursor = backend.CursorText
-	}
-	// Select options are painted in an overlay outside the ordinary hit snapshot.
-	if id := openSelectID(a.retained.Root(), a.inputActions); id != 0 {
-		if rectContains(a.inputActions[id].selectOverlay.Popup, a.cursorX, a.cursorY) {
-			cursor = backend.CursorDefault
-		}
-	}
-	return a.setPointerCursor(cursor)
+	return a.setPointerCursor(a.interaction.CursorAt(a.cursorX, a.cursorY))
 }
 
 func (a *App) setPointerCursor(cursor backend.Cursor) error {
@@ -54,4 +43,24 @@ func (r childRuntime) SetCursor(cursor backend.Cursor) error {
 		return native.SetCursor(cursor)
 	}
 	return nil
+}
+
+// resolveCursor translates public choices without exposing backend values.
+func resolveCursor(kind viewKind, cursor Cursor) backend.Cursor {
+	switch cursor {
+	case CursorDefault:
+		return backend.CursorDefault
+	case CursorText:
+		return backend.CursorText
+	case CursorPointer:
+		return backend.CursorPointer
+	}
+	switch kind {
+	case viewInput, viewTextarea:
+		return backend.CursorText
+	case viewButton:
+		return backend.CursorPointer
+	default:
+		return backend.CursorDefault
+	}
 }

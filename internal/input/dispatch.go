@@ -3,6 +3,7 @@ package input
 import (
 	"math"
 
+	"github.com/dxui-org/dxui/internal/backend"
 	"github.com/dxui-org/dxui/internal/platform"
 )
 
@@ -22,6 +23,9 @@ type Node struct {
 	Disabled    bool
 	Enter       bool
 	Space       bool
+	// CursorHit allows cursor-only targets without changing input dispatch.
+	CursorHit bool
+	Cursor    backend.Cursor
 }
 
 // Result summarizes state changes and at most one semantic activation.
@@ -226,12 +230,17 @@ func (c *Controller) State(id uint64) (hovered, pressed, focused, focusVisible b
 
 func (c *Controller) Focused() uint64 { return c.focus }
 
-// TargetAt returns the topmost eligible pointer target without changing focus.
-func (c *Controller) TargetAt(x, y float32) uint64 {
-	if !finitePoint(x, y) {
-		return 0
+// CursorAt resolves the topmost eligible cursor without changing input state.
+func (c *Controller) CursorAt(x, y float32) backend.Cursor {
+	if finitePoint(x, y) {
+		for i := len(c.nodes) - 1; i >= 0; i-- {
+			node := c.nodes[i]
+			if node.CursorHit && !node.Disabled && contains(node.Bounds, x, y) && (!node.ClipSet || contains(node.Clip, x, y)) {
+				return node.Cursor
+			}
+		}
 	}
-	return c.hit(x, y)
+	return backend.CursorDefault
 }
 
 // Focus moves focus to a live eligible identity. It is used by typed overlay

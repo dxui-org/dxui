@@ -97,7 +97,7 @@ func buildInteractionSnapshot(view View, instance *tree.Node, geometry *layout.R
 	assignDocumentOrder(view, instance, orders, &nextOrder)
 	nodes := make([]internalinput.Node, 0, nextOrder)
 	actions := make(map[uint64]inputAction)
-	if err := appendInteractionSnapshot(&nodes, actions, view, instance, geometry, theme, textEngine, orders, 1, paint.Rect{}, false, true, 0, 0, 0, 0, "root"); err != nil {
+	if err := appendInteractionSnapshot(&nodes, actions, view, instance, geometry, theme, textEngine, orders, 1, paint.Rect{}, false, true, true, 0, 0, 0, 0, "root"); err != nil {
 		return nil, nil, err
 	}
 	overlays := make([]selectOverlay, 0, 1)
@@ -117,7 +117,7 @@ func buildInteractionSnapshot(view View, instance *tree.Node, geometry *layout.R
 		action := actions[overlay.instance.ID]
 		action.selectAnchor, action.selectOverlay = overlay.anchor, overlay.geometry
 		actions[overlay.instance.ID] = action
-		nodes = append(nodes, internalinput.Node{ID: overlay.instance.ID, Bounds: inputRect(overlay.geometry.Popup), Order: orders[overlay.instance.ID], Interactive: true})
+		nodes = append(nodes, internalinput.Node{ID: overlay.instance.ID, Bounds: inputRect(overlay.geometry.Popup), Order: orders[overlay.instance.ID], Interactive: true, CursorHit: true, Cursor: resolveCursor(viewSelect, action.selectp.Style.Cursor)})
 	}
 	componentOverlays, err := collectComponentOverlays(view, instance, geometry, theme)
 	if err != nil {
@@ -139,7 +139,7 @@ func buildInteractionSnapshot(view View, instance *tree.Node, geometry *layout.R
 		tx := overlay.placed.Popup.X - overlay.geometry.Rect.X
 		ty := overlay.placed.Popup.Y - overlay.geometry.Rect.Y
 		if err := appendInteractionSnapshot(&nodes, actions, overlay.view, overlay.instance, overlay.geometry, theme, textEngine, orders, 1,
-			overlay.placed.Popup, true, true, tx, ty, 0, 0, "overlay"); err != nil {
+			overlay.placed.Popup, true, true, true, tx, ty, 0, 0, "overlay"); err != nil {
 			return nil, nil, err
 		}
 		for id, contentAction := range actions {
@@ -182,7 +182,7 @@ func focusableViewKind(kind viewKind) bool {
 	return kind == viewButton || kind == viewInput || kind == viewTextarea || kind == viewToggleSwitch || kind == viewSlider || kind == viewCheckbox || kind == viewRadio || kind == viewScroll || kind == viewVirtualList || kind == viewSelect || kind == viewTabs || kind == viewMenu || kind == viewPopover
 }
 
-func appendInteractionSnapshot(nodes *[]internalinput.Node, actions map[uint64]inputAction, view View, instance *tree.Node, geometry *layout.Result, theme resolvedTheme, textEngine *internaltext.Engine, orders map[uint64]int, parentOpacity float32, inheritedClip paint.Rect, inheritedClipSet, pointerEnabled bool, translateX, translateY float32, parentScroll uint64, depth int, path string) error {
+func appendInteractionSnapshot(nodes *[]internalinput.Node, actions map[uint64]inputAction, view View, instance *tree.Node, geometry *layout.Result, theme resolvedTheme, textEngine *internaltext.Engine, orders map[uint64]int, parentOpacity float32, inheritedClip paint.Rect, inheritedClipSet, pointerEnabled, cursorEnabled bool, translateX, translateY float32, parentScroll uint64, depth int, path string) error {
 	if view.node == nil || instance == nil || geometry == nil {
 		return fmt.Errorf("%s has incomplete tree geometry", path)
 	}
@@ -234,14 +234,16 @@ func appendInteractionSnapshot(nodes *[]internalinput.Node, actions map[uint64]i
 	node := internalinput.Node{
 		ID: instance.ID, Bounds: inputRect(rect), Order: orders[instance.ID],
 		Interactive: interactive, Focusable: focusable, Disabled: disabled,
-		Enter: view.node.kind == viewButton || view.node.kind == viewSelect || view.node.kind == viewTabs || view.node.kind == viewMenu || view.node.kind == viewPopover || view.node.kind == viewInput && view.node.input.OnSubmit != nil,
-		Space: view.node.kind == viewButton || view.node.kind == viewToggleSwitch || view.node.kind == viewCheckbox || view.node.kind == viewRadio || view.node.kind == viewSelect || view.node.kind == viewTabs || view.node.kind == viewMenu || view.node.kind == viewPopover,
+		CursorHit: cursorEnabled && !disabled && childPointerEnabled && worldOpacity > 0,
+		Cursor:    resolveCursor(view.node.kind, props.Style.Cursor),
+		Enter:     view.node.kind == viewButton || view.node.kind == viewSelect || view.node.kind == viewTabs || view.node.kind == viewMenu || view.node.kind == viewPopover || view.node.kind == viewInput && view.node.input.OnSubmit != nil,
+		Space:     view.node.kind == viewButton || view.node.kind == viewToggleSwitch || view.node.kind == viewCheckbox || view.node.kind == viewRadio || view.node.kind == viewSelect || view.node.kind == viewTabs || view.node.kind == viewMenu || view.node.kind == viewPopover,
 	}
 	if clipSet {
 		node.Clip, node.ClipSet = inputRect(clip), true
 	}
 	paintOrder := len(*nodes)
-	if focusable {
+	if focusable || props.Style.Cursor != CursorAuto {
 		*nodes = append(*nodes, node)
 	}
 	switch view.node.kind {
@@ -340,7 +342,7 @@ func appendInteractionSnapshot(nodes *[]internalinput.Node, actions map[uint64]i
 			childTranslateX -= instance.State.ScrollX
 			childTranslateY -= instance.State.ScrollY
 		}
-		if err := appendInteractionSnapshot(nodes, actions, view.node.children[index], instance.Children[index], rawGeometry.Children[index], theme, textEngine, orders, worldOpacity, clip, clipSet, childPointerEnabled, childTranslateX, childTranslateY, parentScroll, depth, path); err != nil {
+		if err := appendInteractionSnapshot(nodes, actions, view.node.children[index], instance.Children[index], rawGeometry.Children[index], theme, textEngine, orders, worldOpacity, clip, clipSet, childPointerEnabled, cursorEnabled && !disabled, childTranslateX, childTranslateY, parentScroll, depth, path); err != nil {
 			return fmt.Errorf("%s child %d: %w", path, index, err)
 		}
 	}

@@ -66,7 +66,7 @@ func runSDLRuntimeSmoke(mode string) error {
 		OnShown: func(app *App) {
 			defer app.Close()
 			shown++
-			for _, cursor := range []backend.Cursor{backend.CursorText, backend.CursorDefault, backend.CursorText, backend.CursorDefault} {
+			for _, cursor := range []backend.Cursor{backend.CursorText, backend.CursorDefault, backend.CursorPointer, backend.CursorPointer, backend.CursorDefault} {
 				if startupErr = app.setPointerCursor(cursor); startupErr != nil {
 					return
 				}

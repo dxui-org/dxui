@@ -587,6 +587,9 @@ func validateBoxProperties(properties BoxProps, path string) error {
 }
 
 func validateNodeProperties(properties viewProps, path string) error {
+	if properties.Style.Cursor > CursorPointer {
+		return fmt.Errorf("dxui: %s has invalid cursor", path)
+	}
 	if properties.Pointer > PointerNone {
 		return fmt.Errorf("dxui: %s has invalid pointer behavior", path)
 	}
@@ -739,6 +742,7 @@ func callBuilder(stage string, builder func() View) (view View, err error) {
 
 func applyNodeProperties(properties *tree.Properties, node viewProps, usesTextMetrics bool) {
 	properties.Semantics.Pointer = uint8(node.Pointer)
+	properties.Semantics.Cursor = uint8(node.Style.Cursor)
 	layout := node.Style
 	shrink, shrinkSet := layout.Shrink.get()
 	alignSelf, alignSelfSet := layout.AlignSelf.get()

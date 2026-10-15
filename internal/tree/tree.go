@@ -128,6 +128,7 @@ type SemanticsProperties struct {
 	HasTabs   bool
 	HasMenu   bool
 	Pointer   uint8
+	Cursor    uint8
 }
 
 // ResourceProperties identify description-side resource inputs. The core

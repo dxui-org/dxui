@@ -94,6 +94,7 @@ type Cursor uint8
 const (
 	CursorDefault Cursor = iota
 	CursorText
+	CursorPointer
 )
 
 // CursorRuntime sets the native pointer on the UI thread.

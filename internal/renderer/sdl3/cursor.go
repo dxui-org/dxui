@@ -17,7 +17,7 @@ type nativeCursorAPI interface {
 }
 
 type cursorState struct {
-	values  [2]nativeCursor
+	values  [3]nativeCursor
 	current backend.Cursor
 	set     bool
 }
@@ -27,7 +27,7 @@ func (driver *Driver) SetCursor(shape backend.Cursor) error {
 	if driver.closed {
 		return fmt.Errorf("sdl3: set cursor: window closed")
 	}
-	if shape != backend.CursorDefault && shape != backend.CursorText {
+	if shape > backend.CursorPointer {
 		return fmt.Errorf("sdl3: invalid cursor %d", shape)
 	}
 	owner := driver
@@ -72,6 +72,9 @@ func (systemAPI) createCursor(shape backend.Cursor) (nativeCursor, error) {
 	id := sdl.SYSTEM_CURSOR_DEFAULT
 	if shape == backend.CursorText {
 		id = sdl.SYSTEM_CURSOR_TEXT
+	}
+	if shape == backend.CursorPointer {
+		id = sdl.SYSTEM_CURSOR_POINTER
 	}
 	value, err := sdl.CreateSystemCursor(id)
 	if err != nil {
